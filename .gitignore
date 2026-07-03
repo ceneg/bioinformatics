@@ -1,0 +1,15 @@
+.venv/
+data/original/
+*.pyc
+__pycache__/
+.pixi/
+*.log
+.DS_Store
+docs/
+unused/
+logs/
+.agent/
+.roo/
+memory.md
+coding_standards.md
+README.private.md
