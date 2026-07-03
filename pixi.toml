@@ -63,6 +63,7 @@ q2-feature-classifier = "*"
 q2-taxa = "*"
 q2-alignment = "*"
 q2-phylogeny = "*"
+q2-dada2 = "*"
 biopython = "*"
 
 [environments]
