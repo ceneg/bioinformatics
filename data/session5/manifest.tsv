@@ -1,0 +1,11 @@
+sample-id	forward-absolute-filepath	reverse-absolute-filepath
+Sample1	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample1_S1_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample1_S1_L001_R2_001.fastq.gz
+Sample2	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample2_S2_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample2_S2_L001_R2_001.fastq.gz
+Sample3	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample3_S3_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample3_S3_L001_R2_001.fastq.gz
+Sample4	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample4_S4_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample4_S4_L001_R2_001.fastq.gz
+Sample5	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample5_S5_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample5_S5_L001_R2_001.fastq.gz
+Sample6	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample6_S6_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample6_S6_L001_R2_001.fastq.gz
+Sample7	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample7_S7_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample7_S7_L001_R2_001.fastq.gz
+Sample8	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample8_S8_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample8_S8_L001_R2_001.fastq.gz
+Sample9	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample9_S9_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample9_S9_L001_R2_001.fastq.gz
+Sample10	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample10_S10_L001_R1_001.fastq.gz	/home/bmb/005/00Coding/00vaje/data/session5/raw_reads/Sample10_S10_L001_R2_001.fastq.gz
