@@ -1,43 +1,44 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -e
 
-# Setup exit codes tracker
-s1_status="PENDING"
-s2_status="PENDING"
-s2_r_status="PENDING"
-s3_status="PENDING"
-s4_r_status="PENDING"
-s5_status="PENDING"
+# --- Environment Tests ---
+echo -e "\n--- [Running Basic Environment Checks] ---"
+pixi run test
 
-# Ensure we're in the repository root directory
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
-
+# ----------------------------------------------------
+# EXTENDED WORKFLOW INTEGRATION TESTS
+# ----------------------------------------------------
+echo -e "\n=========================================================="
+echo "          STARTING EXTENDED INTEGRATION TESTS"
 echo "=========================================================="
-echo "          STARTING EXTENDED WORKFLOW INTEGRATION TEST      "
-echo "=========================================================="
+echo "Note: This will generate real outputs and then clean them up."
 
-# Create snapshot of baseline files
-echo "Taking baseline snapshot of directory tree..."
-find . -not -path '*/.pixi/*' -not -path '*/.git/*' | sort > baseline_files.txt
+# Store base directory
+BASE_DIR=$(pwd)
 
-# Function to clean up safely
-cleanup_generated_files() {
+# Trap to ensure cleanup happens even if script fails
+cleanup() {
     echo -e "\n=========================================================="
-    echo "          CLEANING UP GENERATED WORKFLOW ARTIFACTS        "
+    echo "          CLEANING UP GENERATED WORKFLOW ARTIFACTS"
     echo "=========================================================="
-
-    if [ -f baseline_files.txt ]; then
-        find . -not -path '*/.pixi/*' -not -path '*/.git/*' | sort > post_files.txt
-        
-        # Find new files/folders created during the run
-        comm -13 baseline_files.txt post_files.txt | sort -r | while read -r path; do
-            # Remove leading './'
-            norm_path="${path#./}"
+    
+    # We will ONLY delete files that are explicitly known to be generated
+    # by this script. To do this safely, we use a whitelist approach.
+    
+    # Run git clean but ONLY in dry-run mode to see what WOULD be deleted
+    # compared to the tracked files and the .gitignore.
+    
+    # For safety, we just explicitly delete the specific output files/folders 
+    # we expect our tools to have generated, IF they exist.
+    
+    # Find all untracked files/folders
+    untracked=$(git ls-files --others --exclude-standard)
+    
+    for item in $untracked; do
+        if [ -e "$item" ]; then
+            # Normalize path
+            norm_path=$(echo "$item" | sed "s|^$BASE_DIR/||")
             
-            if [ -z "$norm_path" ] || [ "$norm_path" = "." ] || [ "$norm_path" = "baseline_files.txt" ] || [ "$norm_path" = "post_files.txt" ]; then
-                continue
-            fi
-
             # Check whitelist of safe paths to delete
             is_safe=0
             if [[ "$norm_path" == spades_out* ]] || \
@@ -52,36 +53,40 @@ cleanup_generated_files() {
                [[ "$norm_path" == data/session3/*.sorted.bam* ]] || \
                [[ "$norm_path" == data/session3/ecoli_ref_region.fasta.* ]] || \
                [[ "$norm_path" == data/session3/variants.vcf ]] || \
+               [[ "$norm_path" == rep-seqs.qza ]] || \
+               [[ "$norm_path" == table.qza ]] || \
+               [[ "$norm_path" == stats-dada2.qza ]] || \
+               [[ "$norm_path" == base-transition-stats.qza ]] || \
+               [[ "$norm_path" == aligned-rep-seqs.qza ]] || \
+               [[ "$norm_path" == masked-aligned-rep-seqs.qza ]] || \
+               [[ "$norm_path" == unrooted-tree.qza ]] || \
+               [[ "$norm_path" == rooted-tree.qza ]] || \
                [[ "$norm_path" == taxonomy.qza ]] || \
                [[ "$norm_path" == core-metrics-results* ]] || \
                [[ "$norm_path" == taxa-bar-plots.qzv ]] || \
                [[ "$norm_path" == "scratch_trans_list.txt" ]]; then
                 is_safe=1
             fi
-
-            if [ "$is_safe" -eq 1 ]; then
-                if [ -d "$norm_path" ]; then
-                    # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results
-                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "data/session2/"* ]]; then
-                        rm -rf "$norm_path"
-                        echo "[CLEAN] Removed directory: $norm_path"
-                    else
-                        rmdir "$norm_path" 2>/dev/null && echo "[CLEAN] Removed empty directory: $norm_path"
-                    fi
-                elif [ -f "$norm_path" ] || [ -L "$norm_path" ]; then
-                    rm -f "$norm_path"
+            
+            if [ $is_safe -eq 1 ]; then
+                if [ -d "$item" ]; then
+                    rm -rf "$item"
+                    echo "[CLEAN] Removed directory: $norm_path"
+                else
+                    rm -f "$item"
                     echo "[CLEAN] Removed file: $norm_path"
                 fi
-            else
-                echo "[WARN] Not deleting untracked new path (not in whitelist): $norm_path"
             fi
-        done
-        rm -f baseline_files.txt post_files.txt
+        fi
+    done
+    
+    # Special cleanup for spades_out to ensure it is fully removed
+    if [ -d "spades_out" ]; then
+        rm -rf "spades_out"
+        echo "[CLEAN] Removed directory: spades_out"
     fi
 }
-
-# Register cleanup trap to ensure cleanup happens even if user interrupts or test fails
-trap cleanup_generated_files EXIT
+trap cleanup EXIT
 
 # ----------------------------------------------------
 # SESSION 1: De Novo Assembly & Gene Prediction
@@ -210,18 +215,32 @@ fi
 # SESSION 5: 16S Amplicon & Microbiome Diversity (QIIME 2)
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 5: QIIME 2 Workflows] ---"
-if pixi run -e qiime2 qiime feature-classifier classify-sklearn \
+if pixi run -e qiime2 qiime dada2 denoise-single \
+     --i-demultiplexed-seqs data/session5/amplicon_demux.qza \
+     --p-trim-left 0 \
+     --p-trunc-len 120 \
+     --o-representative-sequences rep-seqs.qza \
+     --o-table table.qza \
+     --o-denoising-stats stats-dada2.qza \
+     --o-base-transition-stats base-transition-stats.qza && \
+   pixi run -e qiime2 qiime phylogeny align-to-tree-mafft-fasttree \
+     --i-sequences rep-seqs.qza \
+     --o-alignment aligned-rep-seqs.qza \
+     --o-masked-alignment masked-aligned-rep-seqs.qza \
+     --o-tree unrooted-tree.qza \
+     --o-rooted-tree rooted-tree.qza && \
+   pixi run -e qiime2 qiime feature-classifier classify-sklearn \
      --i-classifier data/session5/silva_classifier_excerpt.qza \
-     --i-reads data/session5/rep-seqs.qza \
+     --i-reads rep-seqs.qza \
      --o-classification taxonomy.qza && \
    pixi run -e qiime2 qiime diversity core-metrics-phylogenetic \
-     --i-phylogeny data/session5/rooted-tree.qza \
-     --i-table data/session5/table.qza \
+     --i-phylogeny rooted-tree.qza \
+     --i-table table.qza \
      --p-sampling-depth 1000 \
      --m-metadata-file data/session5/sample_metadata.tsv \
      --output-dir core-metrics-results && \
    pixi run -e qiime2 qiime taxa barplot \
-     --i-table data/session5/table.qza \
+     --i-table table.qza \
      --i-taxonomy taxonomy.qza \
      --m-metadata-file data/session5/sample_metadata.tsv \
      --o-visualization taxa-bar-plots.qzv; then
