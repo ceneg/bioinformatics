@@ -5,6 +5,9 @@ set -eu
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+echo "=== Fetching Reference Data ==="
+bash scripts/data_generation/00_download_references.sh
+
 echo "=== Testing Data ==="
 python scripts/verify_data.py
 
@@ -18,8 +21,10 @@ echo "Checking genomika..."
 pixi run -e genomika spades.py --version | head -n 1
 echo "Checking transkriptomika..."
 pixi run -e transkriptomika salmon --version 2>&1 | head -n 1
+pixi run -e transkriptomika Rscript -e 'library(DESeq2); library(tximport)' 2>/dev/null && echo "R packages (DESeq2, tximport) OK" || { echo "[ERROR] R packages missing or broken in transkriptomika!"; exit 1; }
 echo "Checking polimorfizmi..."
 pixi run -e polimorfizmi samtools --version | head -n 1
+pixi run -e polimorfizmi Rscript -e 'library(vcfR); library(adegenet)' 2>/dev/null && echo "R packages (vcfR, adegenet) OK" || { echo "[ERROR] R packages missing or broken in polimorfizmi!"; exit 1; }
 echo "Checking diverziteta..."
 pixi run -e diverziteta Rscript --version 2>&1 | head -n 1
 echo "Checking qiime2..."
