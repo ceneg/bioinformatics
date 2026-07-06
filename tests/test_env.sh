@@ -19,6 +19,21 @@ set +o pipefail 2>/dev/null || true
 
 echo "Checking genomika..."
 pixi run -e genomika spades.py --version | head -n 1
+
+# Manually execute post-link scripts for R packages if Pixi skipped them
+echo "Checking and executing any pending R post-link scripts..."
+for env in transkriptomika polimorfizmi diverziteta; do
+    if [ -d ".pixi/envs/$env/bin" ]; then
+        for script in .pixi/envs/$env/bin/*post-link.sh; do
+            if [ -f "$script" ]; then
+                echo "Running post-link script: $script"
+                # Export PREFIX as CONDA_PREFIX for compatibility with Bioconductor scripts
+                pixi run -e "$env" bash -c 'export PREFIX=$CONDA_PREFIX; bash "$1"' _ "$script" >/dev/null 2>&1 || true
+            fi
+        done
+    fi
+done
+
 echo "Checking transkriptomika..."
 pixi run -e transkriptomika salmon --version 2>&1 | head -n 1
 pixi run -e transkriptomika Rscript -e 'library(DESeq2); library(tximport)' 2>/dev/null && echo "R packages (DESeq2, tximport) OK" || { echo "[ERROR] R packages missing or broken in transkriptomika!"; exit 1; }
