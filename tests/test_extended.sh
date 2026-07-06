@@ -1,44 +1,46 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
+set -o pipefail
 
-# --- Environment Tests ---
-echo -e "\n--- [Running Basic Environment Checks] ---"
-pixi run test
+# Setup exit codes tracker
+s1_status="PENDING"
+s2_status="PENDING"
+s2_r_status="PENDING"
+s3_status="PENDING"
+s4_r_status="PENDING"
+s5_status="PENDING"
 
-# ----------------------------------------------------
-# EXTENDED WORKFLOW INTEGRATION TESTS
-# ----------------------------------------------------
-echo -e "\n=========================================================="
-echo "          STARTING EXTENDED INTEGRATION TESTS"
+# Ensure we're in the repository root directory
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
 echo "=========================================================="
-echo "Note: This will generate real outputs and then clean them up."
+echo "          STARTING EXTENDED WORKFLOW INTEGRATION TEST      "
+echo "=========================================================="
 
-# Store base directory
-BASE_DIR=$(pwd)
+# Create snapshot of baseline files
+echo "Taking baseline snapshot of directory tree..."
+find . -not -path '*/.pixi/*' -not -path '*/.git/*' | sort > baseline_files.txt
 
-# Trap to ensure cleanup happens even if script fails
-cleanup() {
+# Function to clean up safely
+cleanup_generated_files() {
     echo -e "\n=========================================================="
-    echo "          CLEANING UP GENERATED WORKFLOW ARTIFACTS"
+    echo "          CLEANING UP GENERATED WORKFLOW ARTIFACTS        "
     echo "=========================================================="
-    
-    # We will ONLY delete files that are explicitly known to be generated
-    # by this script. To do this safely, we use a whitelist approach.
-    
-    # Run git clean but ONLY in dry-run mode to see what WOULD be deleted
-    # compared to the tracked files and the .gitignore.
-    
-    # For safety, we just explicitly delete the specific output files/folders 
-    # we expect our tools to have generated, IF they exist.
-    
-    # Find all untracked files/folders
-    untracked=$(git ls-files --others --exclude-standard)
-    
-    for item in $untracked; do
-        if [ -e "$item" ]; then
-            # Normalize path
-            norm_path=$(echo "$item" | sed "s|^$BASE_DIR/||")
+
+    if [ -f baseline_files.txt ]; then
+        find . -not -path '*/.pixi/*' -not -path '*/.git/*' | sort > post_files.txt
+        
+        deleted_count=0
+        # Find new files/folders created during the run
+        comm -13 baseline_files.txt post_files.txt | sort -r | while read -r path; do
+            # Remove leading './'
+            norm_path="${path#./}"
             
+            if [ -z "$norm_path" ] || [ "$norm_path" = "." ] || [ "$norm_path" = "baseline_files.txt" ] || [ "$norm_path" = "post_files.txt" ]; then
+                continue
+            fi
+
             # Check whitelist of safe paths to delete
             is_safe=0
             if [[ "$norm_path" == spades_out* ]] || \
@@ -64,36 +66,40 @@ cleanup() {
                [[ "$norm_path" == taxonomy.qza ]] || \
                [[ "$norm_path" == core-metrics-results* ]] || \
                [[ "$norm_path" == taxa-bar-plots.qzv ]] || \
+               [[ "$norm_path" == tmp_s*.log ]] || \
                [[ "$norm_path" == "scratch_trans_list.txt" ]]; then
                 is_safe=1
             fi
-            
-            if [ $is_safe -eq 1 ]; then
-                if [ -d "$item" ]; then
-                    rm -rf "$item"
-                    echo "[CLEAN] Removed directory: $norm_path"
-                else
-                    rm -f "$item"
-                    echo "[CLEAN] Removed file: $norm_path"
+
+            if [ "$is_safe" -eq 1 ]; then
+                if [ -d "$norm_path" ]; then
+                    # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results
+                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "data/session2/"* ]]; then
+                        rm -rf "$norm_path"
+                        ((deleted_count++))
+                    else
+                        rmdir "$norm_path" 2>/dev/null && ((deleted_count++))
+                    fi
+                elif [ -f "$norm_path" ] || [ -L "$norm_path" ]; then
+                    rm -f "$norm_path"
+                    ((deleted_count++))
                 fi
             fi
-        fi
-    done
-    
-    # Special cleanup for spades_out to ensure it is fully removed
-    if [ -d "spades_out" ]; then
-        rm -rf "spades_out"
-        echo "[CLEAN] Removed directory: spades_out"
+        done
+        rm -f baseline_files.txt post_files.txt
+        echo "[CLEAN] Removed $deleted_count files and directories."
     fi
 }
-trap cleanup EXIT
+
+# Remove trap so cleanup happens only when we call it manually at the end
+trap - EXIT
 
 # ----------------------------------------------------
 # SESSION 1: De Novo Assembly & Gene Prediction
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 1: Genomics] ---"
-if pixi run -e genomika spades.py -1 data/session1/yeast_chrom1_R1.fastq.gz -2 data/session1/yeast_chrom1_R2.fastq.gz -o spades_out/ --only-assembler && \
-   pixi run -e genomika augustus --species=saccharomyces --gff3=on spades_out/scaffolds.fasta > genes.gff3; then
+if (pixi run -e genomika spades.py -1 data/session1/yeast_chrom1_R1.fastq.gz -2 data/session1/yeast_chrom1_R2.fastq.gz -o spades_out/ --only-assembler && \
+   pixi run -e genomika augustus --species=saccharomyces --gff3=on spades_out/scaffolds.fasta > genes.gff3) 2>&1 | tee tmp_s1.log; then
     
     # Validation
     if [ -s spades_out/scaffolds.fasta ] && [ -s genes.gff3 ] && grep -q ">" spades_out/scaffolds.fasta && grep -q "augustus" genes.gff3; then
@@ -112,14 +118,14 @@ fi
 # SESSION 2: Transcript Quantification & DGE
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 2: Transcriptomics (Salmon)] ---"
-if pixi run -e transkriptomika salmon index -t data/original/escherichia_coli_transcriptome.fasta -i salmon_index/ && \
+if (pixi run -e transkriptomika salmon index -t data/original/escherichia_coli_transcriptome.fasta -i salmon_index/ && \
    (
      success=1
      for SAMPLE in CTL_rep1 CTL_rep2 CTL_rep3 TRT_rep1 TRT_rep2 TRT_rep3; do
          pixi run -e transkriptomika salmon quant -i salmon_index/ -l A -1 data/session2/${SAMPLE}_R1.fastq.gz -2 data/session2/${SAMPLE}_R2.fastq.gz -o data/session2/${SAMPLE} || success=0
      done
      [ $success -eq 1 ]
-   ); then
+   )) 2>&1 | tee tmp_s2.log; then
     
     # Validation
     if [ -d salmon_index ] && [ -s data/session2/CTL_rep1/quant.sf ]; then
@@ -153,7 +159,7 @@ dds <- DESeq(dds)
 res <- results(dds)
 if (nrow(res) != 10) stop("DESeq2 output length incorrect")
 message("[OK] DESeq2 executes and libraries loaded successfully.")
-'; then
+' 2>&1 | tee tmp_s2_r.log; then
     s2_r_status="SUCCESS"
 else
     s2_r_status="FAILED"
@@ -164,7 +170,7 @@ fi
 # SESSION 3: Read Mapping & Variant Calling
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 3: Polymorphisms (BWA & bcftools)] ---"
-if pixi run -e polimorfizmi bwa index data/session3/ecoli_ref_region.fasta && \
+if (pixi run -e polimorfizmi bwa index data/session3/ecoli_ref_region.fasta && \
    (
      success=1
      for IND in ind1 ind2 ind3 ind4 ind5; do
@@ -176,7 +182,7 @@ if pixi run -e polimorfizmi bwa index data/session3/ecoli_ref_region.fasta && \
      [ $success -eq 1 ]
    ) && \
    pixi run -e polimorfizmi bcftools mpileup -f data/session3/ecoli_ref_region.fasta data/session3/*.sorted.bam | \
-   pixi run -e polimorfizmi bcftools call -mv -o data/session3/variants.vcf; then
+   pixi run -e polimorfizmi bcftools call -mv -o data/session3/variants.vcf) 2>&1 | tee tmp_s3.log; then
     
     # Validation
     if [ -s data/session3/variants.vcf ] && grep -q "#CHROM" data/session3/variants.vcf; then
@@ -204,7 +210,7 @@ for (lib in libs) {
   }
 }
 message("[OK] Polimorfizmi R libraries loaded successfully.")
-'; then
+' 2>&1 | tee tmp_s4.log; then
     s4_r_status="SUCCESS"
 else
     s4_r_status="FAILED"
@@ -215,7 +221,7 @@ fi
 # SESSION 5: 16S Amplicon & Microbiome Diversity (QIIME 2)
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 5: QIIME 2 Workflows] ---"
-if pixi run -e qiime2 qiime dada2 denoise-single \
+if (pixi run -e qiime2 qiime dada2 denoise-single \
      --i-demultiplexed-seqs data/session5/amplicon_demux.qza \
      --p-trim-left 0 \
      --p-trunc-len 120 \
@@ -243,7 +249,7 @@ if pixi run -e qiime2 qiime dada2 denoise-single \
      --i-table table.qza \
      --i-taxonomy taxonomy.qza \
      --m-metadata-file data/session5/sample_metadata.tsv \
-     --o-visualization taxa-bar-plots.qzv; then
+     --o-visualization taxa-bar-plots.qzv) 2>&1 | tee tmp_s5.log; then
     
     # Validation
     if [ -s taxonomy.qza ] && [ -d core-metrics-results ] && [ -s taxa-bar-plots.qzv ]; then
@@ -258,6 +264,20 @@ else
     echo "[ERROR] Session 5 execution failed."
 fi
 
+
+# Extract error tails
+ERRORS=""
+if [[ "$s1_status" == FAILED* ]] && [ -f tmp_s1.log ]; then ERRORS+="\n--- Session 1 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s1.log)\n"; fi
+if [[ "$s2_status" == FAILED* ]] && [ -f tmp_s2.log ]; then ERRORS+="\n--- Session 2 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2.log)\n"; fi
+if [[ "$s2_r_status" == FAILED* ]] && [ -f tmp_s2_r.log ]; then ERRORS+="\n--- Session 2 R Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2_r.log)\n"; fi
+if [[ "$s3_status" == FAILED* ]] && [ -f tmp_s3.log ]; then ERRORS+="\n--- Session 3 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s3.log)\n"; fi
+if [[ "$s4_r_status" == FAILED* ]] && [ -f tmp_s4.log ]; then ERRORS+="\n--- Session 4 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s4.log)\n"; fi
+if [[ "$s5_status" == FAILED* ]] && [ -f tmp_s5.log ]; then ERRORS+="\n--- Session 5 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s5.log)\n"; fi
+
+# Execute cleanup manually BEFORE printing the final report
+cleanup_generated_files
+rm -f tmp_s1.log tmp_s2.log tmp_s2_r.log tmp_s3.log tmp_s4.log tmp_s5.log
+
 # Print final test report
 echo -e "\n=========================================================="
 echo "                  EXTENDED TEST SUMMARY REPORT            "
@@ -269,6 +289,14 @@ echo "Session 3 (Polymorphisms - BWA & bcftools): $s3_status"
 echo "Session 4 (R libraries check):              $s4_r_status"
 echo "Session 5 (Microbiome - QIIME 2):           $s5_status"
 echo "=========================================================="
+
+if [ -n "$ERRORS" ]; then
+    echo -e "\n=========================================================="
+    echo "            FAILURE REASONS (LOG EXTRACTS)                "
+    echo "=========================================================="
+    echo -e "$ERRORS"
+    echo "=========================================================="
+fi
 
 # Exit with failure code if any session failed
 if [ "$s1_status" = "SUCCESS" ] && \
