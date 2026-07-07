@@ -714,6 +714,7 @@ environments:
       - conda: https://conda.anaconda.org/bioconda/linux-64/bwa-0.7.18-he4a0461_1.tar.bz2
       - conda: https://conda.anaconda.org/bioconda/linux-64/htslib-1.21-h5efdd21_0.tar.bz2
       - conda: https://conda.anaconda.org/bioconda/linux-64/samtools-1.19.2-h50ea8bc_1.tar.bz2
+      - conda: https://conda.anaconda.org/bioconda/linux-64/vcftools-0.1.16-pl5321hdcf5f25_11.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/aws-c-auth-0.7.22-h96bc93b_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/aws-c-cal-0.6.14-h88a6e22_1.conda
@@ -987,6 +988,7 @@ environments:
       - conda: https://conda.anaconda.org/bioconda/osx-64/bwa-0.7.18-h10309d6_1.tar.bz2
       - conda: https://conda.anaconda.org/bioconda/osx-64/htslib-1.21-hec81eee_0.tar.bz2
       - conda: https://conda.anaconda.org/bioconda/osx-64/samtools-1.19.2-hd510865_1.tar.bz2
+      - conda: https://conda.anaconda.org/bioconda/osx-64/vcftools-0.1.16-pl5321h447d7a5_11.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/_r-mutex-1.0.1-anacondar_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/compiler-rt_osx-64-18.1.7-h7312ed1_0.conda
@@ -3697,6 +3699,18 @@ packages:
   license_family: BSD
   size: 7781440
   timestamp: 1755286449222
+- conda: https://conda.anaconda.org/bioconda/linux-64/vcftools-0.1.16-pl5321hdcf5f25_11.tar.bz2
+  sha256: 0287ab77c816ce8dd861c738c931bc757d000fd921c9077715e753e6cb8c1447
+  md5: eb7d27fa63f26404f7a19d8a21658f77
+  depends:
+  - libgcc-ng >=12
+  - libstdcxx-ng >=12
+  - libzlib >=1.2.13,<2.0a0
+  - perl >=5.32.1,<5.33.0a0 *_perl5
+  - zlib
+  license: LGPL
+  size: 485176
+  timestamp: 1720707702109
 - conda: https://conda.anaconda.org/bioconda/linux-64/vsearch-2.30.4-hd6d6fdc_0.conda
   sha256: 63e3b5a23bb37b54f2c0f49b0031a2845a25fdfc0f5424e03a635302cd9a128d
   md5: cd119b75f746b5b4fd22c51075195583
@@ -5286,6 +5300,20 @@ packages:
     - unifrac-binaries >=1.5.1,<2.0a0
   size: 1480859
   timestamp: 1755287630189
+- conda: https://conda.anaconda.org/bioconda/osx-64/vcftools-0.1.16-pl5321h447d7a5_11.tar.bz2
+  sha256: 7e8d1706f00a0444f08bd679824eaa18431824b330c93d0db447072d917ad4c7
+  md5: 4c907b72ea9cff4929829955509926fd
+  depends:
+  - libcxx >=16
+  - libzlib >=1.2.13,<2.0a0
+  - perl >=5.32.1,<5.33.0a0 *_perl5
+  - zlib
+  license: LGPL
+  run_exports:
+    weak:
+    - vcftools >=0.1.16,<0.2.0a0
+  size: 483034
+  timestamp: 1720708821638
 - conda: https://conda.anaconda.org/bioconda/osx-64/vsearch-2.30.4-heca6186_0.conda
   sha256: 34177bba27889d7529dc20fb65e84201b6946aacd5c3f8ba0edbd8929c9ff150
   md5: f0cf8e185698c7f456d8f0ab0ba3d467

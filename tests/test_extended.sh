@@ -93,6 +93,7 @@ cleanup_and_report() {
                [[ "$norm_path" == data/session3/*.sorted.bam* ]] || \
                [[ "$norm_path" == data/session3/ecoli_ref_region.fasta.* ]] || \
                [[ "$norm_path" == data/session3/variants.vcf ]] || \
+               [[ "$norm_path" == data/session3/vcf_stats.* ]] || \
                [[ "$norm_path" == rep-seqs.qza ]] || \
                [[ "$norm_path" == table.qza ]] || \
                [[ "$norm_path" == stats-dada2.qza ]] || \
@@ -287,10 +288,12 @@ if (pixi run -e polimorfizmi bwa index data/session3/ecoli_ref_region.fasta && \
      [ $success -eq 1 ]
    ) && \
    pixi run -e polimorfizmi bcftools mpileup -f data/session3/ecoli_ref_region.fasta data/session3/*.sorted.bam | \
-   pixi run -e polimorfizmi bcftools call -mv -o data/session3/variants.vcf) 2>&1 | tee tmp_s3.log; then
+   pixi run -e polimorfizmi bcftools call -mv -o data/session3/variants.vcf && \
+   pixi run -e polimorfizmi vcftools --vcf data/session3/variants.vcf --freq --out data/session3/vcf_stats && \
+   pixi run -e polimorfizmi vcftools --vcf data/session3/variants.vcf --depth --out data/session3/vcf_stats) 2>&1 | tee tmp_s3.log; then
     
     # Validation
-    if [ -s data/session3/variants.vcf ] && grep -q "#CHROM" data/session3/variants.vcf; then
+    if [ -s data/session3/variants.vcf ] && grep -q "#CHROM" data/session3/variants.vcf && [ -s data/session3/vcf_stats.frq ] && [ -s data/session3/vcf_stats.idepth ]; then
         s3_status="SUCCESS"
         echo "[OK] Session 3 tools and outputs successfully verified."
     else

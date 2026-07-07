@@ -37,6 +37,7 @@ r-rcolorbrewer = "*"
 bwa = "0.7.*"
 samtools = "1.19.*"
 bcftools = "1.19.*"
+vcftools = "*"
 
 # --- SESSION 4: Population Genetics ---
 [feature.polimorfizmi2.dependencies]
