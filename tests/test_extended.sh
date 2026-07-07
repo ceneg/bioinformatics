@@ -22,7 +22,15 @@ echo "=========================================================="
 echo "Taking baseline snapshot of directory tree..."
 find . -not -path '*/.pixi/*' -not -path '*/.git/*' | sort > baseline_files.txt
 
-# Manually execute post-link scripts for R packages if Pixi skipped them
+# Configure Pixi to run post-link scripts natively for future installations
+pixi config set --local run-post-link-scripts insecure
+
+# Force pixi to instantiate the R environments so the directories exist
+pixi run -e transkriptomika true 2>/dev/null || true
+pixi run -e polimorfizmi true 2>/dev/null || true
+pixi run -e diverziteta true 2>/dev/null || true
+
+# Manually execute post-link scripts for R packages if Pixi skipped them previously
 echo "Checking and executing any pending R post-link scripts..."
 shopt -s dotglob
 for env in transkriptomika polimorfizmi diverziteta; do
