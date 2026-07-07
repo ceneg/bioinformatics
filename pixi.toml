@@ -3,7 +3,7 @@ name = "bioinformatics-course"
 version = "2026.1.0"
 description = "Practical Genomics Workflows — Undergraduate Course Environment"
 channels = ["https://packages.qiime2.org/qiime2/2026.4/qiime2/released", "conda-forge", "bioconda"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "osx-64"]
 
 [dependencies]
 python = "3.11.*"
