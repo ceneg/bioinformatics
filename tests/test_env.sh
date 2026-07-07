@@ -22,17 +22,19 @@ pixi run -e genomika spades.py --version | head -n 1
 
 # Manually execute post-link scripts for R packages if Pixi skipped them
 echo "Checking and executing any pending R post-link scripts..."
+shopt -s dotglob
 for env in transkriptomika polimorfizmi diverziteta; do
     if [ -d ".pixi/envs/$env/bin" ]; then
         for script in .pixi/envs/$env/bin/*post-link.sh; do
             if [ -f "$script" ]; then
                 echo "Running post-link script: $script"
                 # Export PREFIX as CONDA_PREFIX for compatibility with Bioconductor scripts
-                pixi run -e "$env" bash -c 'export PREFIX=$CONDA_PREFIX; bash "$1"' _ "$script" >/dev/null 2>&1 || true
+                pixi run -e "$env" bash -c 'export PREFIX=$CONDA_PREFIX; bash "$1"' _ "$script" || echo "[WARNING] Post-link script failed. Continuing..."
             fi
         done
     fi
 done
+shopt -u dotglob
 
 echo "Checking transkriptomika..."
 pixi run -e transkriptomika salmon --version 2>&1 | head -n 1
