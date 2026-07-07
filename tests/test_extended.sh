@@ -88,6 +88,7 @@ cleanup_and_report() {
                [[ "$norm_path" == data/session2/TRT_rep2* ]] || \
                [[ "$norm_path" == data/session2/TRT_rep3* ]] || \
                [[ "$norm_path" == session2_plots* ]] || \
+               [[ "$norm_path" == session4_plots* ]] || \
                [[ "$norm_path" == data/session2/deseq2_results.tsv ]] || \
                [[ "$norm_path" == data/session3/*.sorted.bam* ]] || \
                [[ "$norm_path" == data/session3/ecoli_ref_region.fasta.* ]] || \
@@ -114,7 +115,7 @@ cleanup_and_report() {
             if [ "$is_safe" -eq 1 ]; then
                 if [ -d "$norm_path" ]; then
                     # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results/quast_out
-                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "quast_out" ]] || [[ "$norm_path" == "data/session2/"* ]] || [[ "$norm_path" == "session2_plots" ]]; then
+                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "quast_out" ]] || [[ "$norm_path" == "data/session2/"* ]] || [[ "$norm_path" == "session2_plots" ]] || [[ "$norm_path" == "session4_plots" ]]; then
                         rm -rf "$norm_path"
                         deleted_count=$((deleted_count + 1))
                     else
@@ -304,7 +305,7 @@ fi
 # ----------------------------------------------------
 # SESSION 4: Population Genetics (R checks)
 # ----------------------------------------------------
-echo -e "\n--- [Running Session 4: Population Structure R Modules Check] ---"
+echo -e "\n--- [Running Session 4: Population Structure R Workflow] ---"
 if pixi run -e polimorfizmi Rscript -e '
 message("Loading polimorfizmi R libraries...")
 libs <- c("vcfR", "adegenet", "hierfstat", "ggplot2")
@@ -313,7 +314,42 @@ for (lib in libs) {
     stop("Package ", lib, " is missing!")
   }
 }
-message("[OK] Polimorfizmi R libraries loaded successfully.")
+message("Testing Population Genetics workflow execution...")
+library(vcfR)
+library(adegenet)
+library(hierfstat)
+library(ggplot2)
+
+vcf <- read.vcfR("data/session4/population_structure.vcf", verbose = FALSE)
+metadata <- read.table("data/session4/sample_metadata.tsv", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+gen_data <- vcfR2genind(vcf)
+pop(gen_data) <- factor(metadata$family)
+
+stats <- basic.stats(gen_data)
+
+Ho_avg <- mean(stats$Ho, na.rm = TRUE)
+He_avg <- mean(stats$Hs, na.rm = TRUE)
+Fis_avg <- mean(stats$Fis, na.rm = TRUE)
+
+X <- tab(gen_data, NA.method = "mean")
+pca <- dudi.pca(X, cent = TRUE, scale = FALSE, scannf = FALSE, nf = 2)
+
+pca_df <- data.frame(
+  Sample = indNames(gen_data),
+  PC1 = pca$li$Axis1,
+  PC2 = pca$li$Axis2,
+  Family = pop(gen_data)
+)
+
+dir.create("session4_plots", showWarnings = FALSE)
+png("session4_plots/pca_plot.png", width = 800, height = 600)
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Family, label = Sample)) +
+  geom_point(size = 4, alpha = 0.8) +
+  theme_minimal() +
+  labs(title = "PCA of Genomic Variants")
+dev.off()
+message("[OK] Polimorfizmi R workflow executed successfully.")
 ' 2>&1 | tee tmp_s4.log; then
     s4_r_status="SUCCESS"
 else
