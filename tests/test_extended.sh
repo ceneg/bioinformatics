@@ -87,6 +87,8 @@ cleanup_and_report() {
                [[ "$norm_path" == data/session2/TRT_rep1* ]] || \
                [[ "$norm_path" == data/session2/TRT_rep2* ]] || \
                [[ "$norm_path" == data/session2/TRT_rep3* ]] || \
+               [[ "$norm_path" == session2_plots* ]] || \
+               [[ "$norm_path" == data/session2/deseq2_results.tsv ]] || \
                [[ "$norm_path" == data/session3/*.sorted.bam* ]] || \
                [[ "$norm_path" == data/session3/ecoli_ref_region.fasta.* ]] || \
                [[ "$norm_path" == data/session3/variants.vcf ]] || \
@@ -112,7 +114,7 @@ cleanup_and_report() {
             if [ "$is_safe" -eq 1 ]; then
                 if [ -d "$norm_path" ]; then
                     # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results/quast_out
-                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "quast_out" ]] || [[ "$norm_path" == "data/session2/"* ]]; then
+                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "quast_out" ]] || [[ "$norm_path" == "data/session2/"* ]] || [[ "$norm_path" == "session2_plots" ]]; then
                         rm -rf "$norm_path"
                         deleted_count=$((deleted_count + 1))
                     else
@@ -224,16 +226,43 @@ for (lib in libs) {
     stop("Package ", lib, " is missing!")
   }
 }
-message("Testing DESeq2 execution...")
+message("Testing DESeq2 workflow execution...")
+library(tximport)
 library(DESeq2)
-cnts <- matrix(rnbinom(n=100, mu=100, size=1/0.5), ncol=10)
-cond <- factor(rep(c("A","B"), each=5))
-coldata <- data.frame(row.names=colnames(cnts), cond)
-dds <- DESeqDataSetFromMatrix(countData=cnts, colData=coldata, design=~cond)
+library(readr)
+library(ggplot2)
+
+sample_ids <- c("CTL_rep1", "CTL_rep2", "CTL_rep3", "TRT_rep1", "TRT_rep2", "TRT_rep3")
+conditions <- c("CTL", "CTL", "CTL", "TRT", "TRT", "TRT")
+coldata <- data.frame(sample_id = sample_ids, condition = factor(conditions, levels = c("CTL", "TRT")), row.names = sample_ids)
+
+quant_files <- file.path("data/session2", coldata$sample_id, "quant.sf")
+names(quant_files) <- coldata$sample_id
+
+tx_names <- read_tsv(quant_files[1], col_types = cols())$Name
+tx2gene <- data.frame(TXNAME = tx_names, GENENAME = tx_names)
+txi <- tximport(quant_files, type = "salmon", tx2gene = tx2gene, dropInfReps = TRUE)
+
+dds <- DESeqDataSetFromTximport(txi, colData = coldata, design = ~ condition)
 dds <- DESeq(dds)
-res <- results(dds)
-if (nrow(res) != 10) stop("DESeq2 output length incorrect")
-message("[OK] DESeq2 executes and libraries loaded successfully.")
+
+res_shrunk <- lfcShrink(dds, coef = "condition_TRT_vs_CTL", type = "normal")
+res_df <- as.data.frame(res_shrunk)
+res_df <- res_df[order(res_df$padj), ]
+write.table(res_df, "data/session2/deseq2_results.tsv", sep = "\t", quote = FALSE, col.names = NA)
+
+res_plot <- res_df
+res_plot$threshold <- res_plot$padj < 0.05 & abs(res_plot$log2FoldChange) > 1.0
+
+dir.create("session2_plots", showWarnings = FALSE)
+png("session2_plots/volcano_plot.png", width = 800, height = 600)
+ggplot(res_plot, aes(x = log2FoldChange, y = -log10(padj), color = threshold)) +
+  geom_point(alpha = 0.8) +
+  scale_color_manual(values = c("black", "red")) +
+  theme_minimal() +
+  labs(title = "Volcano Plot (TRT vs CTL)")
+dev.off()
+message("[OK] DESeq2 full workflow executed successfully.")
 ' 2>&1 | tee tmp_s2_r.log; then
     s2_r_status="SUCCESS"
 else
