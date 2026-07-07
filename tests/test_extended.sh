@@ -28,6 +28,15 @@ cleanup_and_report() {
     set +e
     set +o pipefail
 
+    # Extract error tails FIRST, before cleanup loop deletes the log files
+    ERRORS=""
+    if [[ "$s1_status" == FAILED* ]] && [ -f tmp_s1.log ]; then ERRORS+="\n--- Session 1 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s1.log)\n"; fi
+    if [[ "$s2_status" == FAILED* ]] && [ -f tmp_s2.log ]; then ERRORS+="\n--- Session 2 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2.log)\n"; fi
+    if [[ "$s2_r_status" == FAILED* ]] && [ -f tmp_s2_r.log ]; then ERRORS+="\n--- Session 2 R Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2_r.log)\n"; fi
+    if [[ "$s3_status" == FAILED* ]] && [ -f tmp_s3.log ]; then ERRORS+="\n--- Session 3 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s3.log)\n"; fi
+    if [[ "$s4_r_status" == FAILED* ]] && [ -f tmp_s4.log ]; then ERRORS+="\n--- Session 4 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s4.log)\n"; fi
+    if [[ "$s5_status" == FAILED* ]] && [ -f tmp_s5.log ]; then ERRORS+="\n--- Session 5 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s5.log)\n"; fi
+
     echo -e "\n=========================================================="
     echo "          CLEANING UP GENERATED WORKFLOW ARTIFACTS        "
     echo "=========================================================="
@@ -71,14 +80,17 @@ cleanup_and_report() {
                [[ "$norm_path" == core-metrics-results* ]] || \
                [[ "$norm_path" == taxa-bar-plots.qzv ]] || \
                [[ "$norm_path" == tmp_s*.log ]] || \
+               [[ "$norm_path" == fastp_report.html ]] || \
+               [[ "$norm_path" == fastp.json ]] || \
+               [[ "$norm_path" == quast_out* ]] || \
                [[ "$norm_path" == "scratch_trans_list.txt" ]]; then
                 is_safe=1
             fi
 
             if [ "$is_safe" -eq 1 ]; then
                 if [ -d "$norm_path" ]; then
-                    # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results
-                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "data/session2/"* ]]; then
+                    # Only remove directory if it's empty or we are removing spades_out/salmon_index/core-metrics-results/quast_out
+                    if [[ "$norm_path" == "spades_out" ]] || [[ "$norm_path" == "salmon_index" ]] || [[ "$norm_path" == "core-metrics-results" ]] || [[ "$norm_path" == "quast_out" ]] || [[ "$norm_path" == "data/session2/"* ]]; then
                         rm -rf "$norm_path"
                         deleted_count=$((deleted_count + 1))
                     else
@@ -93,15 +105,6 @@ cleanup_and_report() {
         rm -f baseline_files.txt post_files.txt
         echo "[CLEAN] Removed $deleted_count files and directories."
     fi
-
-    # Extract error tails
-    ERRORS=""
-    if [[ "$s1_status" == FAILED* ]] && [ -f tmp_s1.log ]; then ERRORS+="\n--- Session 1 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s1.log)\n"; fi
-    if [[ "$s2_status" == FAILED* ]] && [ -f tmp_s2.log ]; then ERRORS+="\n--- Session 2 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2.log)\n"; fi
-    if [[ "$s2_r_status" == FAILED* ]] && [ -f tmp_s2_r.log ]; then ERRORS+="\n--- Session 2 R Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s2_r.log)\n"; fi
-    if [[ "$s3_status" == FAILED* ]] && [ -f tmp_s3.log ]; then ERRORS+="\n--- Session 3 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s3.log)\n"; fi
-    if [[ "$s4_r_status" == FAILED* ]] && [ -f tmp_s4.log ]; then ERRORS+="\n--- Session 4 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s4.log)\n"; fi
-    if [[ "$s5_status" == FAILED* ]] && [ -f tmp_s5.log ]; then ERRORS+="\n--- Session 5 Error Log (Last 30 lines) ---\n$(tail -n 30 tmp_s5.log)\n"; fi
 
     rm -f tmp_s1.log tmp_s2.log tmp_s2_r.log tmp_s3.log tmp_s4.log tmp_s5.log
 
@@ -146,11 +149,13 @@ trap cleanup_and_report EXIT
 # SESSION 1: De Novo Assembly & Gene Prediction
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 1: Genomics] ---"
-if (pixi run -e genomika spades.py -1 data/session1/yeast_chrom1_R1.fastq.gz -2 data/session1/yeast_chrom1_R2.fastq.gz -o spades_out/ --only-assembler && \
-   pixi run -e genomika augustus --species=saccharomyces --gff3=on spades_out/scaffolds.fasta > genes.gff3) 2>&1 | tee tmp_s1.log; then
+if (pixi run -e genomika fastp -i data/session1/yeast_chrom1_R1.fastq.gz -I data/session1/yeast_chrom1_R2.fastq.gz -h fastp_report.html && \
+    pixi run -e genomika spades.py -1 data/session1/yeast_chrom1_R1.fastq.gz -2 data/session1/yeast_chrom1_R2.fastq.gz -o spades_out/ --only-assembler && \
+    pixi run -e genomika quast spades_out/scaffolds.fasta -o quast_out && \
+    pixi run -e genomika augustus --species=saccharomyces --gff3=on spades_out/scaffolds.fasta > genes.gff3) 2>&1 | tee tmp_s1.log; then
     
     # Validation
-    if [ -s spades_out/scaffolds.fasta ] && [ -s genes.gff3 ] && grep -q ">" spades_out/scaffolds.fasta && grep -q "augustus" genes.gff3; then
+    if [ -s spades_out/scaffolds.fasta ] && [ -s genes.gff3 ] && [ -s fastp_report.html ] && [ -d quast_out ] && grep -q ">" spades_out/scaffolds.fasta && grep -q "augustus" genes.gff3; then
         s1_status="SUCCESS"
         echo "[OK] Session 1 tools and outputs successfully verified."
     else
@@ -166,7 +171,7 @@ fi
 # SESSION 2: Transcript Quantification & DGE
 # ----------------------------------------------------
 echo -e "\n--- [Running Session 2: Transcriptomics (Salmon)] ---"
-if (pixi run -e transkriptomika salmon index -t data/original/escherichia_coli_transcriptome.fasta -i salmon_index/ && \
+if (pixi run -e transkriptomika salmon index -t data/session2/escherichia_coli_transcriptome.fasta -i salmon_index/ && \
    (
      success=1
      for SAMPLE in CTL_rep1 CTL_rep2 CTL_rep3 TRT_rep1 TRT_rep2 TRT_rep3; do
