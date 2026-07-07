@@ -1,5 +1,5 @@
 [workspace]
-name = "bioinformatics-course"
+name = "vaje"
 version = "2026.1.0"
 description = "Practical Genomics Workflows — Undergraduate Course Environment"
 channels = ["https://packages.qiime2.org/qiime2/2026.4/qiime2/released", "conda-forge", "bioconda"]
