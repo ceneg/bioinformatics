@@ -5,6 +5,7 @@ set -eu
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+
 echo "=== Testing Data ==="
 python scripts/verify_data.py
 

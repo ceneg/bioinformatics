@@ -147,5 +147,11 @@ def main():
         out_r2 = out_dir / f"{sample_name}_R2.fastq.gz"
         logger.info(f"Finished {sample_name}: generated gzipped read files: {out_r1.name}, {out_r2.name}")
 
+    # 7. Copy the reference transcriptome to the session directory for students to use
+    import shutil
+    dest_ref = out_dir / "escherichia_coli_transcriptome.fasta"
+    shutil.copy2(ref_path, dest_ref)
+    logger.info(f"Copied reference transcriptome to {dest_ref}")
+
 if __name__ == "__main__":
     main()
