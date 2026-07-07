@@ -19,6 +19,8 @@ set +o pipefail 2>/dev/null || true
 
 echo "Checking genomika..."
 pixi run -e genomika spades.py --version | head -n 1
+pixi run -e genomika fastp --version 2>&1 | head -n 1
+pixi run -e genomika quast --version | head -n 1
 
 # Manually execute post-link scripts for R packages if Pixi skipped them
 echo "Checking and executing any pending R post-link scripts..."
