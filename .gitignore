@@ -6,6 +6,7 @@ __pycache__/
 *.log
 .DS_Store
 docs/
+docs/student.user.edits.260818/
 unused/
 logs/
 .agent/

@@ -13,7 +13,7 @@ metadata <- read.table("data/session4/sample_metadata.tsv", header = TRUE, sep =
 gen_data <- vcfR2genind(vcf)
 pop(gen_data) <- factor(metadata$family)
 
-# 2. Izračun osnovnih genetskih statistik
+# 2. Izračun osnovnih genskih statistik
 stats <- basic.stats(gen_data)
 
 Ho_avg <- mean(stats$Ho, na.rm = TRUE)
@@ -45,7 +45,7 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = Family, label = Sample)) +
 dev.off()
 
 # 4. Minimalno vpeto omrežje (MSN)
-# Osebke povežemo glede na genetsko razdaljo med njimi. Debelina in dolžina
+# Osebke povežemo glede na gensko razdaljo med njimi. Debelina in dolžina
 # povezav odražata sorodnost, barva pa pripadnost družini.
 msn <- poppr.msn(gen_data, diss.dist(gen_data), showplot = FALSE)
 
