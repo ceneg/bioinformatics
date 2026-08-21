@@ -27,7 +27,6 @@ ENC="tests/test_extended.sh.enc"
 KEY="${1:-${VAJE_KEY:-}}"
 if [ -z "$KEY" ]; then
     echo "Uporaba: bash tests/seal_extended.sh <KLJUC>" >&2
-    echo "Ključ najdete v README.private.md." >&2
     exit 2
 fi
 
