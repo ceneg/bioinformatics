@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
 #
-# Zaklep razširjenega testa.
+# Seal the extended test.
 #
-# Razširjeni test vsebuje rešitve vseh nalog — tudi tistih, ki jih morajo
-# študenti napisati sami. Repozitorij je javen, zato izvorne skripte ne
-# objavljamo: shranjena je le šifrirana različica `test_extended.sh.enc`.
+# The extended test contains the solution to every task, including the ones
+# students have to write themselves. The repository is public, so the plaintext
+# source is never published: only the encrypted `test_extended.sh.enc` is.
 #
-#   tests/test_extended_src.sh   <- izvorna koda (NI v gitu, jo urejate vi)
-#   tests/test_extended.sh.enc   <- šifrirana različica (je v gitu)
-#   tests/test_extended.sh       <- majhen zaganjalnik, ki zahteva ključ
+#   tests/test_extended_src.sh   <- plaintext source (NOT in git; edit this one)
+#   tests/test_extended.sh.enc   <- encrypted copy (in git)
+#   tests/test_extended.sh       <- small loader that asks for the key
 #
-# Po vsaki spremembi izvorne skripte morate zagnati to skripto, sicer bo
-# šifrirana različica zastarela.
+# Run this script after every change to the source, otherwise the encrypted
+# copy goes stale.
 #
-# Uporaba:
-#   bash tests/seal_extended.sh <KLJUC>
-#
-# Ključ je zapisan v README.private.md (ta datoteka ni na GitHubu).
+# Usage:
+#   bash tests/seal_extended.sh <KEY>
 #
 set -euo pipefail
 
@@ -39,8 +37,8 @@ if [ ! -f "$SRC" ]; then
     exit 1
 fi
 
-# Preverimo, da je izvorna skripta sintaktično veljavna, preden jo zaklenemo —
-# zaklenjene pokvarjene skripte se namreč ne da preprosto pregledati.
+# Check the source is syntactically valid before sealing it: a broken script
+# cannot easily be inspected once encrypted.
 if ! bash -n "$SRC"; then
     echo "[NAPAKA] $SRC vsebuje sintaktično napako. Zaklepanje prekinjeno." >&2
     exit 1
@@ -48,7 +46,7 @@ fi
 
 openssl enc -aes-256-cbc -pbkdf2 -a -salt -in "$SRC" -out "$ENC" -pass pass:"$KEY"
 
-# Preverimo, da se da rezultat res odšifrirati nazaj v izvirnik.
+# Verify the result really decrypts back to the original.
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 if ! openssl enc -aes-256-cbc -pbkdf2 -a -d -in "$ENC" -out "$TMP" -pass pass:"$KEY" 2>/dev/null; then

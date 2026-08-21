@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# Zaganjalnik razširjenega integracijskega testa.
+# Loader for the extended integration test.
 #
-# Ta test požene celotne poteke vseh petih vaj, vključno z dodatnimi nalogami,
-# zato vsebuje tudi vse rešitve. Ker je repozitorij javen, je sama koda testa
-# šifrirana (`tests/test_extended.sh.enc`) in jo lahko požene le učitelj s
-# ključem.
+# The test runs all five session pipelines end to end, including the optional
+# tasks, so it contains every solution. The repository is public, so the test
+# itself is encrypted (`tests/test_extended.sh.enc`) and only the instructor,
+# who has the key, can run it.
 #
-# Uporaba (za učitelja):
-#   pixi run test-extended <KLJUC>
-#   bash tests/test_extended.sh <KLJUC>
+# Usage (instructor):
+#   pixi run test-extended <KEY>
+#   bash tests/test_extended.sh <KEY>
 #
-# Študentom ta test ni namenjen — za preverjanje namestitve uporabite
-# `pixi run test`, ki je javen in ne potrebuje ključa.
+# This test is not meant for students: to verify their installation they run
+# `pixi run test`, which is public and needs no key.
 #
 set -euo pipefail
 
@@ -60,13 +60,13 @@ if ! openssl enc -aes-256-cbc -pbkdf2 -a -d -in "$ENC" -out "$TMP" -pass pass:"$
     exit 3
 fi
 
-# Preverimo, da je odšifrirana vsebina res skripta in ne naključni bajti
-# (napačen ključ lahko v redkih primerih vrne izhod brez napake).
+# Make sure the decrypted content really is a script and not random bytes:
+# a wrong key can occasionally produce output without reporting an error.
 if ! head -n 1 "$TMP" | grep -q '^#!/usr/bin/env bash'; then
     echo "[NAPAKA] Napačen ključ — odšifrirana vsebina ni veljavna skripta." >&2
     exit 3
 fi
 
-# Skripta teče iz začasne datoteke, zato ji pot do repozitorija podamo posebej.
+# The script runs from a temporary file, so pass the repository path explicitly.
 export VAJE_REPO_ROOT="$REPO_ROOT"
 bash "$TMP"
