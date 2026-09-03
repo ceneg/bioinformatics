@@ -13,6 +13,13 @@ python = "3.11.*"
 fastp = "*"
 spades = "3.15.*"
 quast = "*"
+# Keep augustus at a build compiled WITHOUT AVX2. Bioconda build pl5321h9716f88_9
+# is vectorised with AVX2 (281 AVX2 instructions, 1912 ymm registers) and dies with
+# "Illegal instruction (core dumped)" on any CPU older than Haswell/Zen -- seen on an
+# Ubuntu 20.04 lab machine on 2026-09-03. Build _10 has none and is what pixi.lock
+# pins. Predictions are identical (87 genes / 93 CDS, asserted by the extended test).
+# After any `pixi update`, re-check with:
+#   objdump -d .pixi/envs/genomika/bin/augustus | grep -c '%ymm'      # must be 0
 augustus = "3.5.*"
 biopython = "1.83.*"
 
