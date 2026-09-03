@@ -40,7 +40,14 @@ for env in transkriptomika polimorfizmi; do
             if [ -f "$script" ]; then
                 echo "Running post-link script: $script"
                 # Export PREFIX as CONDA_PREFIX for compatibility with Bioconductor scripts
-                pixi run -e "$env" bash -c 'export PREFIX=$CONDA_PREFIX; bash "$1"' _ "$script" || echo "[WARNING] Post-link script failed. Continuing..."
+                if ! pixi run -e "$env" bash -c 'export PREFIX=$CONDA_PREFIX; bash "$1"' _ "$script"; then
+                    echo "[WARNING] Post-link script failed: $script"
+                    echo "          Bioconductor data packages install their metadata from"
+                    echo "          this script, so the R library check below will fail."
+                    echo "          The script calls 'yq', which needs 'jq' on PATH. 'jq' is"
+                    echo "          declared in pixi.toml for exactly this reason -- if it is"
+                    echo "          missing here, the environment was built from a stale lock."
+                fi
             fi
         done
     fi
